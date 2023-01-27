@@ -2,22 +2,28 @@
 # -*- coding: utf-8 -*-
 # Author: Matt Flood
 
-import os, random, sys, time, urlparse
-from selenium import webdriver
-from bs4 import BeautifulSoup
+import os
+import random
+import time
 from random import shuffle
 
+import undetected_chromedriver as uc
+from bs4 import BeautifulSoup
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
+
 # Configure constants here
-EMAIL = 'youremail@gmail.com'
-PASSWORD = 'password'
-LOGIN_SERVICE = 'Google, Twitter, or Facebook'
+EMAIL = os.getenv('MEDIUM_EMAIL', '')
+PASSWORD = os.getenv('MEDIUM_PASSWORD', '')
+LOGIN_SERVICE = 'Google'
 DRIVER = 'Firefox'
-LIKE_POSTS = True
+LIKE_POSTS = False
 RANDOMIZE_LIKING_POSTS = True
 MAX_LIKES_ON_POST = 50
-COMMENT_ON_POSTS = False
+COMMENT_ON_POSTS = True
 RANDOMIZE_COMMENTING_ON_POSTS = True
-COMMENTS = ['Great read!', 'Good work keep it up!', 'Really enjoyed the content!', 'Very interesting!']
+COMMENTS = ['Great read!', 'Good work keep it up!', 'Really enjoyed the content!', 'Very interesting!', 'Nicee!']
 ARTICLE_BLACK_LIST = ['Sex', 'Drugs', 'Child Labor']
 FOLLOW_USERS = False
 RANDOMIZE_FOLLOWING_USERS = True
@@ -32,66 +38,30 @@ def Launch():
     """
     Launch the Medium bot and ask the user what browser they want to use.
     """
-
-    if 'chrome' not in DRIVER.lower() and 'firefox' not in DRIVER.lower() and 'phantomjs' not in DRIVER.lower():
-
-        # Browser choice
-        print 'Choose your browser:'
-        print '[1] Chrome'
-        print '[2] Firefox/Iceweasel'
-        print '[3] PhantomJS'
-
-        while True:
-            try:
-                browserChoice = int(raw_input('Choice? '))
-            except ValueError:
-                print 'Invalid choice.',
-            else:
-                if browserChoice not in [1,2,3]:
-                    print 'Invalid choice.',
-                else:
-                    break
-
-        StartBrowser(browserChoice)
-
-    elif 'chrome' in DRIVER.lower():
-        StartBrowser(1)
-
-    elif 'firefox' in DRIVER.lower():
-        StartBrowser(2)
-
-    elif 'phantomjs' in DRIVER.lower():
-        StartBrowser(3)
+    StartBrowser()
 
 
-def StartBrowser(browserChoice):
+def StartBrowser():
     """
     Based on the option selected by the user start the selenium browser.
     browserChoice: browser option selected by the user.
     """
-
-    if browserChoice == 1:
-        print '\nLaunching Chrome'
-        browser = webdriver.Chrome()
-    elif browserChoice == 2:
-        print '\nLaunching Firefox/Iceweasel'
-        browser = webdriver.Firefox()
-    elif browserChoice == 3:
-        print '\nLaunching PhantomJS'
-        browser = webdriver.PhantomJS()
+    browser = uc.Chrome()
+    #driver = uc.Chrome(use_subprocess=True)
+    #wait = uc.C
 
     if SignInToService(browser):
-        print 'Success!\n'
+        print ('Success!\n')
         MediumBot(browser)
 
     else:
         soup = BeautifulSoup(browser.page_source, "lxml")
         if soup.find('div', {'class':'alert error'}):
-            print 'Error! Please verify your username and password.'
+            print('Error! Please verify your username and password.')
         elif browser.title == '403: Forbidden':
-            print 'Medium is momentarily unavailable. Please wait a moment, then try again.'
+            print('Medium is momentarily unavailable. Please wait a moment, then try again.')
         else:
-            print 'Please make sure your config is set up correctly.'
+            print('Please make sure your config is set up correctly.')
 
     browser.quit()
 
@@ -102,27 +72,19 @@ def SignInToService(browser):
     begin the botting.
     browser: the selenium browser used to login to Medium.
     """
-
-    serviceToSignWith = LOGIN_SERVICE.lower()
     signInCompleted = False
-    print 'Signing in...'
+        
+    print('Signing in...')
 
     # Sign in
     browser.get('https://medium.com/m/signin?redirect=https%3A%2F%2Fmedium.com%2F')
 
-    if serviceToSignWith == "google":
-        signInCompleted = SignInToGoogle(browser)
-
-    elif serviceToSignWith == "twitter":
-        signInCompleted = SignInToTwitter(browser)
-
-    elif serviceToSignWith == "facebook":
-        signInCompleted = SignInToFacebook(browser)
+    signInCompleted = SignInToMedium(browser)
 
     return signInCompleted
 
 
-def SignInToGoogle(browser):
+def SignInToMedium(browser):
     """
     Sign into Medium using a Google account.
     browser: selenium driver used to interact with the page.
@@ -130,82 +92,20 @@ def SignInToGoogle(browser):
     """
 
     signInCompleted = False
-
-    try:
-        browser.find_element_by_xpath('//button[contains(text(),"Sign in or sign up with email")]').click()
-        browser.find_element_by_name('email').send_keys(EMAIL)
-        browser.find_element_by_class_name('button--google').click()
-        browser.find_element_by_id("next").click()
-        time.sleep(3)
-        browser.find_element_by_id('Passwd').send_keys(PASSWORD)
-        browser.find_element_by_id('signIn').click()
-        time.sleep(3)
-        signInCompleted = True
-    except:
-        pass
-
-    if not signInCompleted:
-        try:
-            browser.find_element_by_id("identifierNext").click()
-            time.sleep(3)
-            browser.find_element_by_name('password').send_keys(PASSWORD)
-            browser.find_element_by_id('passwordNext').click()
-            time.sleep(3)
-            signInCompleted = True
-        except:
-            print "Problem logging into Medium with Google."
-            pass
-
-    return signInCompleted
-
-
-def SignInToTwitter(browser):
-    """
-    Sign into Medium using a Twitter account.
-    browser: selenium driver used to interact with the page.
-    return: true if successfully logged in : false if login failed.
-    """
-
-    signInCompleted = False
-    try:
-        browser.find_element_by_class_name('button--twitter').click()
-
-        if not browser.find_element_by_xpath('//input[@id="username_or_email"]').is_displayed():
-            browser.find_element_by_xpath('//input[@id="allow"]').click()
-            time.sleep(3)
-            signInCompleted = True
-
-        else:
-            browser.find_element_by_xpath('//input[@id="username_or_email"]').send_keys(EMAIL)
-            browser.find_element_by_xpath('//input[@id="password"]').send_keys(PASSWORD)
-            browser.find_element_by_xpath('//input[@id="allow"]').click()
-            time.sleep(3)
-            signInCompleted = True
-    except:
-        print "Problem logging into Medium with Twitter."
-        pass
-
-    return signInCompleted
-
-
-def SignInToFacebook(browser):
-    """
-    Sign into Medium using a Facebook account.
-    browser: selenium driver used to interact with the page.
-    return: true if successfully logged in : false if login failed.
-    """
-
-    signInCompleted = False
-    try:
-        browser.find_element_by_class_name('button--facebook').click()
-        browser.find_element_by_xpath('//input[@id="email"]').send_keys(EMAIL)
-        browser.find_element_by_xpath('//input[@id="pass"]').send_keys(PASSWORD)
-        browser.find_element_by_xpath('//button[@id="loginbutton"]').click()
-        time.sleep(3)
-        signInCompleted = True
-    except:
-        print "Problem logging into Medium with Facebook."
-        pass
+    
+    time.sleep(5)
+    browser.find_element(By.XPATH, "//body/div/div[@role='dialog']/div[@class='ab ac ad ae af ag']/div[@class='pw-susi-modal ah ai aj ak al am an ao ap aq ar']/div[@class='ah as at au l av aw ax ay az ba']/div[@class='bb bc l m bd n be bf bg bh az']/div[@class='bu ak']/a[1]").click()
+    time.sleep(3)
+    browser.find_element(By.NAME, 'identifier').send_keys(EMAIL)
+    browser.find_element(By.XPATH, "//button[@class='VfPpkd-LgbsSe VfPpkd-LgbsSe-OWXEXe-k8QpJ VfPpkd-LgbsSe-OWXEXe-dgl2Hf nCP5yc AjY5Oe DuMIQc LQeN7 qIypjc TrZEUc lw1w4b']").click()
+    time.sleep(3)
+    browser.find_element(By.NAME, 'password').send_keys(PASSWORD)
+    time.sleep(3)
+    browser.find_element(By.XPATH, "//button[@class='VfPpkd-LgbsSe VfPpkd-LgbsSe-OWXEXe-k8QpJ VfPpkd-LgbsSe-OWXEXe-dgl2Hf nCP5yc AjY5Oe DuMIQc LQeN7 qIypjc TrZEUc lw1w4b']").click()
+    time.sleep(20)
+    #browser.get("https://medium.com/me/following/tags")
+    signInCompleted = True
+    
 
     return signInCompleted
 
@@ -243,7 +143,7 @@ def MediumBot(browser):
                 if len(articleURLsVisited) > 530000000:
                     articleURLsVisited = []
 
-                print "Tags in Queue: "+str(len(tagURLsQueued))+" Articles in Queue: "+str(len(articleURLsQueued))
+                print("Tags in Queue: "+str(len(tagURLsQueued))+" Articles in Queue: "+str(len(articleURLsQueued)))
                 articleURL = articleURLsQueued.pop()
                 articleURLsVisited.extend(articleURL)
                 LikeCommentAndFollowOnPost(browser, articleURL)
@@ -254,7 +154,7 @@ def MediumBot(browser):
                     elif random.choice([True, False]):
                         UnFollowUser(browser)
 
-        print '\nPause for 1 hour to wait for new articles to be posted\n'
+        print('\nPause for 1 hour to wait for new articles to be posted\n')
         tagURLsVisitedThisLoop = [] # Reset the tags visited
         time.sleep(3600+(random.randrange(0, 10))*60)
 
@@ -270,7 +170,7 @@ def ScrapeUsersFavoriteTagsUrls(browser):
     time.sleep(5)
     soup = BeautifulSoup(browser.page_source, "lxml")
     tagURLS = []
-    print 'Gathering your favorited tags'
+    print('Gathering your favorited tags')
 
     try:
         for div in soup.find_all('div', class_='u-tableCell u-verticalAlignMiddle'):
@@ -278,16 +178,16 @@ def ScrapeUsersFavoriteTagsUrls(browser):
                 if a["href"] not in tagURLS:
                     tagURLS.append(a["href"])
                     if VERBOSE:
-                        print a["href"]
+                        print(a["href"])
 
     except:
-        print 'Exception thrown in ScrapeUsersFavoriteTagsUrls()'
+        print('Exception thrown in ScrapeUsersFavoriteTagsUrls()')
         pass
 
     if not tagURLS or USE_RELATED_TAGS:
 
         if not tagURLS:
-            print 'No favorited tags found. Grabbing the suggested tags as a starting point.'
+            print('No favorited tags found. Grabbing the suggested tags as a starting point.')
 
         try:
             for div in soup.find_all('div', class_='u-sizeFull u-paddingTop10 u-paddingBottom10 u-borderBox'):
@@ -295,11 +195,11 @@ def ScrapeUsersFavoriteTagsUrls(browser):
                     if a["href"] not in tagURLS:
                         tagURLS.append(a["href"])
                         if VERBOSE:
-                            print a["href"]
+                            print(a["href"])
         except:
-            print 'Exception thrown in ScrapeArticlesOffTagPage()'
+            print('Exception thrown in ScrapeArticlesOffTagPage()')
             pass
-    print ''
+    print('')
 
     return tagURLS
 
@@ -320,7 +220,7 @@ def NavigateToURLAndScrapeRelatedTags(browser, tagURL, tagURLsVisitedThisLoop):
 
     if USE_RELATED_TAGS and tagURL:
 
-        print 'Gathering tags related to : '+tagURL
+        print('Gathering tags related to : '+tagURL)
         soup = BeautifulSoup(browser.page_source, "lxml")
 
         try:
@@ -333,11 +233,11 @@ def NavigateToURLAndScrapeRelatedTags(browser, tagURL, tagURLsVisitedThisLoop):
                         tagURLS.append(a['href'])
 
                         if VERBOSE:
-                            print a['href']
+                            print(a['href'])
         except:
-            print 'Exception thrown in NavigateToURLAndScrapeRelatedTags()'
+            print('Exception thrown in NavigateToURLAndScrapeRelatedTags()')
             pass
-        print ''
+        print('')
 
     return tagURLS
 
@@ -351,7 +251,7 @@ def ScrapeArticlesOffTagPage(browser, articleURLsVisited):
     """
 
     articleURLS = []
-    print 'Gathering your articles for the tag :'+browser.current_url
+    print('Gathering your articles for the tag :'+browser.current_url)
 
     browser.find_element_by_xpath('//a[contains(text(),"Latest stories")]').click()
     time.sleep(2)
@@ -364,12 +264,12 @@ def ScrapeArticlesOffTagPage(browser, articleURLsVisited):
         'js-postArticle js-trackedPost"]/div[2]/a')):
             if a.get_attribute("href") not in articleURLsVisited:
                 if VERBOSE:
-                    print a.get_attribute("href")
+                    print(a.get_attribute("href"))
                 articleURLS.append(a.get_attribute("href"))
     except:
-        print 'Exception thrown in ScrapeArticlesOffTagPage()'
+        print('Exception thrown in ScrapeArticlesOffTagPage()')
         pass
-    print ''
+    print('')
 
     return articleURLS
 
@@ -405,7 +305,7 @@ def LikeCommentAndFollowOnPost(browser, articleURL):
             elif random.choice([True, False]):
                 CommentOnArticle(browser)
 
-        print ''
+        print('')
 
 
 def LikeArticle(browser):
@@ -430,16 +330,16 @@ def LikeArticle(browser):
         if likeButton.is_displayed() and buttonStatus == "upvote":
             if numLikes < MAX_LIKES_ON_POST:
                 if VERBOSE:
-                    print 'Liking the article : \"'+browser.title+'\"'
+                    print('Liking the article : \"'+browser.title+'\"')
                 likeButton.click()
             elif VERBOSE:
-                print 'Article \"'+browser.title+'\" has more likes than your threshold.'
+                print('Article \"'+browser.title+'\" has more likes than your threshold.')
         elif VERBOSE:
-            print 'Article \"'+browser.title+'\" is already liked.'
+            print('Article \"'+browser.title+'\" is already liked.')
 
     except:
         if VERBOSE:
-            print 'Exception thrown when trying to like the article: '+browser.current_url
+            print('Exception thrown when trying to like the article: '+browser.current_url)
         pass
 
 
@@ -467,7 +367,7 @@ def CommentOnArticle(browser):
 
             try:
                 if VERBOSE:
-                    print 'Commenting \"'+comment+'\" on the article : \"'+browser.title+'\"'
+                    print('Commenting \"'+comment+'\" on the article : \"'+browser.title+'\"')
                 commentButton = browser.find_element_by_xpath('//button[@data-action="respond"]')
                 commentButton.click()
                 time.sleep(5)
@@ -477,12 +377,12 @@ def CommentOnArticle(browser):
                 time.sleep(5)
             except:
                 if VERBOSE:
-                    print 'Exception thrown when trying to comment on the article: '+browser.current_url
+                    print('Exception thrown when trying to comment on the article: '+browser.current_url)
                 pass
         elif VERBOSE:
-            print 'We have already commented on this article: '+browser.title
+            print('We have already commented on this article: '+browser.title)
     elif VERBOSE:
-        print 'Cannot comment on an article that is not hosted on Medium.com'
+        print('Cannot comment on an article that is not hosted on Medium.com')
 
 
 def FollowUser(browser):
@@ -492,12 +392,12 @@ def FollowUser(browser):
     """
 
     try:
-        print 'Following the user: '+browser.find_element_by_xpath('//a[@rel="author cc:attributionUrl"]').text
-        print ''
+        print('Following the user: '+browser.find_element_by_xpath('//a[@rel="author cc:attributionUrl"]').text)
+        print('')
         browser.find_element_by_xpath('//button[@data-action="toggle-subscribe-user"]').click()
     except:
         if VERBOSE:
-            print 'Exception thrown when trying to follow the user.'
+            print('Exception thrown when trying to follow the user.')
         pass
 
 
@@ -526,13 +426,13 @@ def UnFollowUser(browser):
                 break
 
         time.sleep(3)
-        print 'UnFollow the user: '+browser.find_element_by_xpath('//h1[@class="hero-title"]').text
-        print ''
+        print('UnFollow the user: '+browser.find_element_by_xpath('//h1[@class="hero-title"]').text)
+        print('')
         browser.find_element_by_xpath('//button[@data-action="toggle-subscribe-user"]').click()
 
     except:
         if VERBOSE:
-            print 'Exception thrown when trying to unfollow a user.'
+            print('Exception thrown when trying to unfollow a user.')
         pass
 
 
